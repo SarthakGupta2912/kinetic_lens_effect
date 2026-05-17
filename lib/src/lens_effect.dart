@@ -7,10 +7,6 @@ import 'lens_options.dart';
 // InheritedWidget — provides the controller down the tree
 // ---------------------------------------------------------------------------
 
-/// Provides a [LensController] to descendant widgets.
-///
-/// Use [LensEffectScope.of(context)] to access the controller from anywhere
-/// inside the [LensEffect] widget tree.
 class LensEffectScope extends InheritedWidget {
   const LensEffectScope({
     super.key,
@@ -20,9 +16,6 @@ class LensEffectScope extends InheritedWidget {
 
   final LensController controller;
 
-  /// Returns the nearest [LensController] above [context] in the tree.
-  ///
-  /// Throws a [FlutterError] if no [LensEffect] is found.
   static LensController of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<LensEffectScope>();
     assert(scope != null,
@@ -30,7 +23,6 @@ class LensEffectScope extends InheritedWidget {
     return scope!.controller;
   }
 
-  /// Returns the nearest [LensController] or null if none is found.
   static LensController? maybeOf(BuildContext context) {
     return context
         .dependOnInheritedWidgetOfExactType<LensEffectScope>()
@@ -46,41 +38,6 @@ class LensEffectScope extends InheritedWidget {
 // LensEffect — the main public widget
 // ---------------------------------------------------------------------------
 
-/// Wraps [child] with an animated kinetic dot-grid lens background.
-///
-/// Place this at (or near) the top of your widget tree:
-///
-/// ```dart
-/// void main() {
-///   runApp(
-///     LensEffect(
-///       child: MaterialApp(home: MyHomePage()),
-///     ),
-///   );
-/// }
-/// ```
-///
-/// ### Customization
-/// Pass a [LensOptions] to tune colors, radius, dot spacing, etc.:
-///
-/// ```dart
-/// LensEffect(
-///   options: LensOptions(
-///     lensColor: Colors.purpleAccent,
-///     lensRadius: 180,
-///     dotSpacing: 40,
-///   ),
-///   child: MaterialApp(home: MyHomePage()),
-/// )
-/// ```
-///
-/// ### Runtime control
-/// Retrieve the [LensController] anywhere inside the tree:
-///
-/// ```dart
-/// final controller = LensEffectScope.of(context);
-/// controller.toggle();
-/// ```
 class LensEffect extends StatefulWidget {
   const LensEffect({
     super.key,
@@ -88,15 +45,8 @@ class LensEffect extends StatefulWidget {
     this.options = const LensOptions(),
     this.controller,
   });
-
-  /// The widget tree that will be rendered on top of the lens background.
   final Widget child;
-
-  /// Visual and behavioral configuration. Defaults to [LensOptions()].
   final LensOptions options;
-
-  /// Provide your own controller to manage it externally. If null, one is
-  /// created internally and disposed automatically.
   final LensController? controller;
 
   @override
@@ -108,6 +58,12 @@ class _LensEffectState extends State<LensEffect>
   late LensController _controller;
   late Ticker _ticker;
   bool _ownsController = false;
+
+  // Key on the Stack so we can convert global -> local pointer coords.
+  // This is what makes the effect accurate when LensEffect is NOT full-screen.
+  final GlobalKey _canvasKey = GlobalKey();
+
+  Size _lastSize = Size.zero;
 
   @override
   void initState() {
@@ -124,19 +80,15 @@ class _LensEffectState extends State<LensEffect>
 
   void _onTick(Duration _) {
     if (!mounted) return;
-    final size = _lastSize;
-    if (size != Size.zero) {
-      _controller.tick(size);
+    if (_lastSize != Size.zero) {
+      _controller.tick(_lastSize);
     }
   }
-
-  Size _lastSize = Size.zero;
 
   @override
   void didUpdateWidget(LensEffect oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.controller != oldWidget.controller) {
-      // External controller swapped
       if (_ownsController) _controller.dispose();
       if (widget.controller != null) {
         _controller = widget.controller!;
@@ -157,8 +109,16 @@ class _LensEffectState extends State<LensEffect>
     super.dispose();
   }
 
+  // The core fix: convert the raw global pointer position into the local
+  // coordinate space of the canvas widget. Without this, the effect origin
+  // is always at (0,0) of the screen, not of the LensEffect widget — so
+  // the cursor and effect drift apart whenever LensEffect is not full-screen.
   void _onPointerEvent(Offset globalPosition) {
-    _controller.setPointerPosition(globalPosition);
+    final RenderBox? box =
+        _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    final Offset local =
+        box != null ? box.globalToLocal(globalPosition) : globalPosition;
+    _controller.setPointerPosition(local);
   }
 
   @override
@@ -174,21 +134,19 @@ class _LensEffectState extends State<LensEffect>
             final size = Size(constraints.maxWidth, constraints.maxHeight);
             if (size != _lastSize) {
               _lastSize = size;
-              // Rebuild grid after layout if size changed
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _controller.invalidateGrid();
               });
             }
             return Stack(
+              key: _canvasKey,
               textDirection: TextDirection.ltr,
               children: [
-                // Background: the dot-grid canvas
                 Positioned.fill(
                   child: RepaintBoundary(
                     child: _LensCanvas(controller: _controller),
                   ),
                 ),
-                // Foreground: the user's content
                 widget.child,
               ],
             );
@@ -200,7 +158,7 @@ class _LensEffectState extends State<LensEffect>
 }
 
 // ---------------------------------------------------------------------------
-// _LensCanvas — stateful wrapper that drives the CustomPainter
+// _LensCanvas
 // ---------------------------------------------------------------------------
 
 class _LensCanvas extends StatelessWidget {
@@ -230,7 +188,6 @@ class _LensPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final opts = controller.options;
 
-    // Fill background
     canvas.drawRect(
       Offset.zero & size,
       Paint()..color = opts.backgroundColor,
