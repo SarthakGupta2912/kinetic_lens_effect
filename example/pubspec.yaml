@@ -1,0 +1,13 @@
+name: kinetic_lens_effect_example
+description: Example app demonstrating the kinetic_lens_effect package.
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  kinetic_lens_effect:
+    path: ../

@@ -1,0 +1,10 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    - always_declare_return_types
+    - prefer_const_constructors
+    - prefer_const_literals_to_create_immutables
+    - sort_constructors_first
+    - unnecessary_this
+    - use_super_parameters
