@@ -1,6 +1,6 @@
 name: kinetic_lens_effect
 description: A beautiful kinetic dot-grid lens effect widget for Flutter. Wrap your app with LensEffect to add an animated, cursor-reactive background with zero boilerplate.
-version: 0.1.0
+version: 1.0.0
 homepage: https://github.com/SarthakGupta2912/kinetic_lens_effect
 repository: https://github.com/SarthakGupta2912/kinetic_lens_effect
 issue_tracker: https://github.com/SarthakGupta2912/kinetic_lens_effect/issues
