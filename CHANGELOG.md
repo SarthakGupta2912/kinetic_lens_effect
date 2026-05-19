@@ -1,4 +1,4 @@
-## 0.1.0
+## 1.0.1
 
 * Initial release.
 * `LensEffect` widget — wrap any widget tree for an animated dot-grid background.
